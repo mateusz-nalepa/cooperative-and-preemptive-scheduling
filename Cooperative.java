@@ -1,13 +1,16 @@
 import java.time.Duration;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
 
 public class Cooperative {
+
+    private static boolean OFFLOAD_CPU;
+
+    private static final ExecutorService CPU_EXECUTOR =
+            Executors.newFixedThreadPool(1);
 
     // monitor queue wait time
     static class MonitoredCallable<T> implements Callable<T> {
@@ -29,6 +32,9 @@ public class Cooperative {
     }
 
     public static void main(String[] args) throws Exception {
+        OFFLOAD_CPU = Arrays.asList(args).contains("offload-cpu");
+        log("Offload CPU flag: " + OFFLOAD_CPU);
+
         System.setProperty("jdk.virtualThreadScheduler.parallelism", "1");
         System.setProperty("jdk.virtualThreadScheduler.maxPoolSize", "1");
 
@@ -49,6 +55,7 @@ public class Cooperative {
 
         futures.forEach(Cooperative::throwingGetFuture);
         executor.close();
+        CPU_EXECUTOR.close();
 
         long totalDuration = (System.currentTimeMillis() - totalStart);
         log("=========================================");
@@ -70,10 +77,17 @@ public class Cooperative {
 
     private static void cpuPart(String id) throws Exception {
         // off-load cpu-code somehow
-//        CpuScope.call(new MonitoredCallable<>(id + "(CPU)", () -> {
-        simulateCpuCode(id);
-//            return null;
-//        }));
+        if (OFFLOAD_CPU) {
+            CPU_EXECUTOR
+                    .submit(new MonitoredCallable<>(id + "(CPU)", () -> {
+                        simulateCpuCode(id);
+                        return null;
+                    }))
+                    .get();
+
+        } else {
+            simulateCpuCode(id);
+        }
     }
 
     static void simulateCpuCode(String id) throws InterruptedException {
@@ -101,3 +115,4 @@ public class Cooperative {
         System.out.println(LocalTime.now() + " : " + Thread.currentThread() + "\t :  " + msg);
     }
 }
+
