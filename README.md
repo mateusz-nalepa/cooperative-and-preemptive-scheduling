@@ -63,7 +63,6 @@ go run Preemptive.go -semaphore-enabled
 ```
 
 #### Preemptive without -semaphore-enabled flag
-```txt
 ```go
 // higher number of tasks at the same time -> slower task execution
 21:38:16.030 : SEMAPHORE_ENABLED=false
